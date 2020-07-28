@@ -113,3 +113,5 @@ function createReactiveObject (target, baseHandler) {
 在`reactivity/baseHandler.js`中，我们先只写了一个基础的拦截处理函数，`get`和`set`。
 
 值得指出的是，在`get`拦截中，如果`Reflect.get(target, key, receiver)`后的值还是一个对象，我们需要再次做Proxy包装。在`set`拦截中，我们可以通过判断原先是否有这个属性以及新老值是否改变，来标识该操作是属性的新增操作还是属性的修改操作，这样也优化了数组push等对于length属性修改时候的无效操作(因为修改length的时候`hasChanged(value, oldValue)为false`)。
+
+具体代码，查看分支[reactivity/proxy](https://github.com/JeasonSun/vue3-study-notes/tree/reactivity/proxy)
