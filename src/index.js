@@ -1,4 +1,4 @@
-import { reactive } from './reactivity'
+import { reactive, effect } from './reactivity'
 
 const state = reactive({
   name: 'mojie',
@@ -6,9 +6,14 @@ const state = reactive({
   hobbies: ['pet', 'read', 'music']
 })
 
-console.log(state)
-console.log(state.name)
-console.log(state.hobbies)
-state.name = 'jeason'
-state.age = 32
-state.sex = 'male'
+effect(() => {
+  console.log('effect', state.name)
+  console.log('effect', JSON.stringify(state.hobbies))
+  console.log('effect', state.sex)
+})
+
+setTimeout(() => {
+  state.name = 'jeason'
+  state.hobbies.push('coding')
+  state.sex = 'male'
+}, 1000)

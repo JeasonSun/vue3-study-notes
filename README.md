@@ -4,7 +4,9 @@
 
 在手写 Vue3 前，我们先搭建好项目开发的结构，在本文中使用 webpack 进行打包编译，当然你可以使用其他熟悉的工具进行打包开发，这不是本文的重点，只要能够将我们的代码打包成一份 vue 库，然后在服务中引用，以便观察测试即可。
 
-## reactive 的实现
+## Vue3的数据响应式系统
+
+### reactive 的实现（代理模式Proxy）
 
 Vue2 升级 Vue3 后很重要的变化就是数据的响应机制，这也是目前大家认识 Vue3 最初需要了解的一个变化。Vue3 中基于 Proxy 的 observer 实现，消除了 Vue2 中基于 Object.defineProperty 的实现所存在的很多限制：
 
@@ -115,3 +117,57 @@ function createReactiveObject (target, baseHandler) {
 值得指出的是，在`get`拦截中，如果`Reflect.get(target, key, receiver)`后的值还是一个对象，我们需要再次做Proxy包装。在`set`拦截中，我们可以通过判断原先是否有这个属性以及新老值是否改变，来标识该操作是属性的新增操作还是属性的修改操作，这样也优化了数组push等对于length属性修改时候的无效操作(因为修改length的时候`hasChanged(value, oldValue)为false`)。
 
 具体代码，查看分支[reactivity/proxy](https://github.com/JeasonSun/vue3-study-notes/tree/reactivity/proxy)
+
+### 依赖收集和触发更新（effect）
+
+通过前面的学习，我们已经了解了如何劫持数据了，接下来我们看一下Vue3响应式系统中的两个问题：如何进行依赖收集，如何触发监听函数。我们大致能够猜到其中的实现逻辑：当用户调用一个effect函数时，会向其中传入一个原始函数，并且创建一个监听函数，并且默认会立即执行一次。在执行过程中，可以通过get读操作进行track依赖收集，将该监听函数与数据进行关联。在set写操作时候，通过trigger触发这个监听函数。
+
+在Vue中，组件进入mount后初始化组件实例代理响应式对象，并且运行组件的ReactiveEffect，render组件会对数据进行get读操作，从而触发track依赖收集，当用户交互，比如点击按钮count++，就会产生副作用，触发代理对象的set读操作，从而触发trigger通知更新，遍历执行依赖。
+
+接下来看一下如何生成effect监听函数，创建副作用。
+
+```javascript
+export function effect (fn, options = {}) {
+  const effect = createReactiveEffect(fn, options)
+  if (!options.lazy) {
+    effect() // 默认就要执行
+  }
+}
+
+const effectStack = []
+let activeEffect
+let uid = 0
+
+function createReactiveEffect (fn, options) {
+  const effect = function reactiveEffect () {
+    if (!effectStack.includes(effect)) {
+      try {
+        effectStack.push(effect)
+        activeEffect = effect
+        return fn()
+      } catch (error) {
+        console.log(error)
+      } finally {
+        effectStack.pop()
+        activeEffect = effectStack[effectStack.length - 1]
+      }
+    }
+  }
+  effect.options = options
+  effect.id = uid++
+  effect.deps = []
+  return effect
+}
+```
+
+在createReactiveEffect函数中，创建一个新的effect函数，并且给这个effect函数挂载一些属性，为后面的computed以及收集依赖做准备，当执行这个effect的时候，会把这个effect推送到一个activeEffectStack栈中，并且把它赋值给全局变量activeEffect，然后执行传进来的fn()，这里的fn就是
+
+```javascript
+fn = () => {
+  console.log('effect', state.name)
+  console.log('effect', JSON.stringify(state.hobbies))
+  console.log('effect', state.sex)
+}
+```
+
+执行上面的fn访问state.name、state.hobbies、state.sex，这样就会触发到proxy中的getter拦截，在这里我们就可以对相应的对象和值进行依赖的收集了。
