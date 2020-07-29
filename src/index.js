@@ -7,9 +7,13 @@ const state = reactive({
 })
 
 effect(() => {
-  console.log('effect', state.name)
-  console.log('effect', JSON.stringify(state.hobbies))
-  console.log('effect', state.sex)
+  console.log('effect1', state.name)
+  console.log('effect1', JSON.stringify(state.hobbies))
+  console.log('effect1', state.sex)
+})
+
+effect(() => {
+  console.log('effect2', state.name)
 })
 
 setTimeout(() => {
